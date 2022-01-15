@@ -1,3 +1,3 @@
-module hauntedness/httputil
+module github.com/hauntedness/httputil
 
 go 1.18
