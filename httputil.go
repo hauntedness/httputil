@@ -54,6 +54,7 @@ func Request(method string, url string, data io.Reader, headers H) []byte {
 	if err != nil {
 		log.Println(err)
 	}
+	resp.Body.Close()
 	return res
 }
 
