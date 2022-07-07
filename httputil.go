@@ -1,6 +1,7 @@
 package httputil
 
 import (
+	"bytes"
 	"io"
 	"io/ioutil"
 	"log"
@@ -20,10 +21,10 @@ var client = &http.Client{}
 var retryQuata int = 1
 
 // send request and retry 3 times
-func Request(method string, url string, data io.Reader, headers H) []byte {
+func Request(method string, url string, data []byte, headers H) []byte {
 	var err error
-	//fmt.Println("going to: ", url)
-	req, err := http.NewRequest(method, url, data)
+	// fmt.Println("going to: ", url)
+	req, err := http.NewRequest(method, url, bytes.NewBuffer(data))
 	if err != nil {
 		log.Println("ERROR: ", err)
 	}
@@ -35,20 +36,21 @@ func Request(method string, url string, data io.Reader, headers H) []byte {
 	for k, v := range headers {
 		req.Header.Set(k, v)
 	}
+
 	var resp *http.Response
 	for retries := 0; retries < retryQuata; {
 		resp, err = client.Do(req)
 		if err != nil {
-			log.Println("ERROR: ", err)
-			log.Printf("retry:%d\n", retries)
+			req.Body = io.NopCloser(bytes.NewBuffer(data))
+			req.GetBody = func() (io.ReadCloser, error) {
+				return io.NopCloser(bytes.NewBuffer(data)), nil
+			}
 			retries = retries + 1
 		} else {
 			break
 		}
 	}
-	if resp == nil {
-		return nil
-	}
+	if resp == nil { return nil }
 	var res []byte
 	res, err = ioutil.ReadAll(resp.Body)
 	if err != nil {
