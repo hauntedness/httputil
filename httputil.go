@@ -20,6 +20,14 @@ var client = &http.Client{}
 
 var retryQuata int = 1
 
+func Get(url string, headers H) []byte {
+	return Request(http.MethodGet, url, nil, headers)
+}
+
+func Post(url string, data []byte, headers H) []byte {
+	return Request(http.MethodPost, url, data, headers)
+}
+
 // send request and retry 3 times
 func Request(method string, url string, data []byte, headers H) []byte {
 	var err error
