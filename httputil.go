@@ -7,6 +7,7 @@ import (
 	"log"
 	"net/http"
 	"net/url"
+	"sync"
 )
 
 const (
@@ -72,13 +73,19 @@ func SetRetry(retryTimes int) {
 	retryQuata = retryTimes + 1
 }
 
+var once = sync.Once{}
+
 func SetProxy(proxyUrl string) {
-	transport := &http.Transport{}
-	transport.Proxy = func(_ *http.Request) (*url.URL, error) {
-		if proxyUrl == "" {
-			proxyUrl = "http://127.0.0.1:58309"
+	once.Do(func() {
+		// Transport caches connections for future re-use,
+		// if call SetProxy too many times, the connection pool will no longer make sense
+		transport := &http.Transport{}
+		transport.Proxy = func(_ *http.Request) (*url.URL, error) {
+			if proxyUrl == "" {
+				proxyUrl = "http://127.0.0.1:58309"
+			}
+			return url.Parse(proxyUrl)
 		}
-		return url.Parse(proxyUrl)
-	}
-	client.Transport = transport
+		client.Transport = transport
+	})
 }
