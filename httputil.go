@@ -1,7 +1,6 @@
 package httputil
 
 import (
-	"bytes"
 	"io"
 	"io/ioutil"
 	"log"
@@ -21,19 +20,19 @@ var client = &http.Client{}
 
 var retryQuata int = 1
 
-func Get(url string, headers H) []byte {
+func Get(url string, headers H) ([]byte, error) {
 	return Request(http.MethodGet, url, nil, headers)
 }
 
-func Post(url string, data []byte, headers H) []byte {
-	return Request(http.MethodPost, url, data, headers)
+func Post(url string, body io.Reader, headers H) ([]byte, error) {
+	return Request(http.MethodPost, url, body, headers)
 }
 
 // send request and retry 3 times
-func Request(method string, url string, data []byte, headers H) []byte {
+func Request(method string, url string, body io.Reader, headers H) ([]byte, error) {
 	var err error
 	// fmt.Println("going to: ", url)
-	req, err := http.NewRequest(method, url, bytes.NewBuffer(data))
+	req, err := http.NewRequest(method, url, body)
 	if err != nil {
 		log.Println("ERROR: ", err)
 	}
@@ -50,23 +49,25 @@ func Request(method string, url string, data []byte, headers H) []byte {
 	for retries := 0; retries < retryQuata; {
 		resp, err = client.Do(req)
 		if err != nil {
-			req.Body = io.NopCloser(bytes.NewBuffer(data))
+			req.Body = io.NopCloser(body)
 			req.GetBody = func() (io.ReadCloser, error) {
-				return io.NopCloser(bytes.NewBuffer(data)), nil
+				return io.NopCloser(body), nil
 			}
 			retries = retries + 1
 		} else {
 			break
 		}
 	}
-	if resp == nil { return nil }
+	if resp == nil {
+		return nil, err
+	}
 	var res []byte
 	res, err = ioutil.ReadAll(resp.Body)
 	if err != nil {
 		log.Println(err)
 	}
 	resp.Body.Close()
-	return res
+	return res, err
 }
 
 func SetRetry(retryTimes int) {
