@@ -2,8 +2,6 @@ package httputil
 
 import (
 	"io"
-	"io/ioutil"
-	"log"
 	"net/http"
 	"net/url"
 	"sync"
@@ -34,7 +32,7 @@ func Request(method string, url string, body io.Reader, headers H) ([]byte, erro
 	// fmt.Println("going to: ", url)
 	req, err := http.NewRequest(method, url, body)
 	if err != nil {
-		log.Println("ERROR: ", err)
+		return nil, err
 	}
 	// default setting
 	req.Header.Set("Content-Type", ContentJson)
@@ -62,9 +60,9 @@ func Request(method string, url string, body io.Reader, headers H) ([]byte, erro
 		return nil, err
 	}
 	var res []byte
-	res, err = ioutil.ReadAll(resp.Body)
+	res, err = io.ReadAll(resp.Body)
 	if err != nil {
-		log.Println(err)
+		return nil, err
 	}
 	resp.Body.Close()
 	return res, err
