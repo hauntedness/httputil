@@ -1,6 +1,8 @@
 package httputil
 
 import (
+	"bytes"
+	"encoding/json"
 	"io"
 	"net/http"
 	"net/url"
@@ -18,17 +20,45 @@ var client = &http.Client{}
 
 var retryQuata int = 1
 
-func Get(url string, headers H) ([]byte, error) {
+func Get(url string, headers H) (data []byte, err error) {
 	return Request(http.MethodGet, url, nil, headers)
 }
 
-func Post(url string, body io.Reader, headers H) ([]byte, error) {
+func Post(url string, body io.Reader, headers H) (data []byte, err error) {
 	return Request(http.MethodPost, url, body, headers)
 }
 
+func GetJson[T any](url string, queryObject any, headers H) (value *T, err error) {
+	return Json[T](http.MethodGet, url, queryObject, headers)
+}
+
+func PostJson[T any](url string, queryObject any, headers H) (value *T, err error) {
+	return Json[T](http.MethodPost, url, queryObject, headers)
+}
+
+func Json[T any](method string, url string, queryObject any, headers H) (value *T, err error) {
+	var data []byte
+	if queryObject != nil {
+		data, err = json.Marshal(queryObject)
+		if err != nil {
+			return nil, err
+		}
+	}
+	reader := bytes.NewReader(data)
+	data, err = Request(method, url, reader, headers)
+	if err != nil {
+		return nil, err
+	}
+	t := new(T)
+	err = json.Unmarshal(data, t)
+	if err != nil {
+		return nil, err
+	}
+	return t, nil
+}
+
 // send request and retry 3 times
-func Request(method string, url string, body io.Reader, headers H) ([]byte, error) {
-	var err error
+func Request(method string, url string, body io.Reader, headers H) (data []byte, err error) {
 	// fmt.Println("going to: ", url)
 	req, err := http.NewRequest(method, url, body)
 	if err != nil {
