@@ -3,6 +3,7 @@ package httputil
 import (
 	"bytes"
 	"encoding/json"
+	"fmt"
 	"io"
 	"net/http"
 	"net/url"
@@ -52,7 +53,13 @@ func Json[T any](method string, url string, queryObject any, headers H) (value *
 	t := new(T)
 	err = json.Unmarshal(data, t)
 	if err != nil {
-		return nil, err
+		if len(data) >= 1024 {
+			data = data[0:1025]
+			data[1022] = '.'
+			data[1023] = '.'
+			data[1024] = '.'
+		}
+		return nil, fmt.Errorf("can not unmarshal data to provided type, data: %s, err: %w", string(data), err)
 	}
 	return t, nil
 }
