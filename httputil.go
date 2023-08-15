@@ -10,7 +10,7 @@ import (
 	"net/url"
 )
 
-var ErrContenthCopyLength = errors.New("The number of bytes copied is not equal to response content length.")
+var ErrContentCopyLength = errors.New("The number of bytes copied is not equal to response content length.")
 
 const (
 	DefaultUserAgent = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/93.0.4577.63 Safari/537.36 Edg/93.0.961.38"
@@ -92,7 +92,7 @@ func RequestAndWriteTo(dst io.Writer, method string, url string, body io.Reader,
 		return err
 	}
 	if resp.ContentLength > -1 && resp.ContentLength != written {
-		return ErrContenthCopyLength
+		return ErrContentCopyLength
 	}
 	return nil
 }
