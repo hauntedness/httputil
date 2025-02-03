@@ -8,6 +8,7 @@ import (
 	"io"
 	"net/http"
 	"net/url"
+	"os"
 )
 
 var ErrContentCopyLength = errors.New("The number of bytes copied is not equal to response content length.")
@@ -48,6 +49,10 @@ func Json[T any](method string, url string, queryObject any, headers H) (value *
 		}
 	}
 	reader := bytes.NewReader(data)
+	if headers == nil {
+		headers = make(H)
+	}
+	headers["Content-Type"] = ContentJson
 	data, err = Request(method, url, reader, headers)
 	if err != nil {
 		return nil, err
@@ -57,9 +62,7 @@ func Json[T any](method string, url string, queryObject any, headers H) (value *
 	if err != nil {
 		if len(data) >= 1024 {
 			data = data[0:1025]
-			data[1022] = '.'
-			data[1023] = '.'
-			data[1024] = '.'
+			copy(data[1022:1025], "...")
 		}
 		return nil, fmt.Errorf("can not unmarshal data to provided type, data: %s, err: %w", string(data), err)
 	}
@@ -94,7 +97,21 @@ func RequestAndWriteTo(dst io.Writer, method string, url string, body io.Reader,
 	if resp.ContentLength > -1 && resp.ContentLength != written {
 		return ErrContentCopyLength
 	}
+	if resp.StatusCode != http.StatusOK {
+		return fmt.Errorf("received response status: %v", resp.Status)
+	}
 	return nil
+}
+
+// Download create file on filepath send request and copy response body to the file
+// it return [ErrContenthCopyLength] if the copied number of bytes doesn't match ContentLength
+func Download(filepath string, method string, url string, body io.Reader, headers H) (err error) {
+	file, err := os.Create(filepath)
+	if err != nil {
+		return err
+	}
+	defer file.Close()
+	return RequestAndWriteTo(file, method, url, body, headers)
 }
 
 // send request and retry 3 times in default
@@ -105,7 +122,6 @@ func Request(method string, url string, body io.Reader, headers H) (data []byte,
 		return nil, err
 	}
 	// default setting
-	req.Header.Set("Content-Type", ContentJson)
 	req.Header.Set("User-Agent", DefaultUserAgent)
 
 	// replace with input headers
@@ -147,9 +163,6 @@ func SetProxy(proxyUrl string) {
 	// if call SetProxy too many times, the connection pool will no longer make sense
 	transport := &http.Transport{}
 	transport.Proxy = func(_ *http.Request) (*url.URL, error) {
-		if proxyUrl == "" {
-			proxyUrl = "http://127.0.0.1:58309"
-		}
 		return url.Parse(proxyUrl)
 	}
 	client.Transport = transport
