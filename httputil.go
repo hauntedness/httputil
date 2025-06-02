@@ -60,7 +60,7 @@ func Json[T any](method string, url string, queryObject any, headers H) (value *
 			data = data[0:1025]
 			copy(data[1022:1025], "...")
 		}
-		return nil, fmt.Errorf("can not unmarshal data to provided type, data: %s, err: %w", string(data), err)
+		return nil, fmt.Errorf("json.Unmarshal, data: %s, err: %w", string(data), err)
 	}
 	return t, nil
 }
@@ -90,8 +90,8 @@ func RequestAndWriteTo(dst io.Writer, method string, url string, body io.Reader,
 	if err != nil {
 		return err
 	}
-	if resp.StatusCode != http.StatusOK {
-		return fmt.Errorf("received response status: %v", resp.Status)
+	if resp.StatusCode >= 400 {
+		return &StatusError{StatusCode: resp.StatusCode}
 	}
 	return nil
 }
@@ -130,6 +130,9 @@ func Request(method string, url string, body io.Reader, headers H) (data []byte,
 	res, err := io.ReadAll(resp.Body)
 	if err != nil {
 		return nil, err
+	}
+	if resp.StatusCode >= 400 {
+		return nil, &StatusError{StatusCode: resp.StatusCode}
 	}
 	return res, err
 }
