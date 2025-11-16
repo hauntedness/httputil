@@ -132,7 +132,7 @@ func Request(method string, url string, body io.Reader, headers H) (data []byte,
 		return nil, err
 	}
 	if resp.StatusCode >= 400 {
-		return nil, &StatusError{StatusCode: resp.StatusCode}
+		return res, &StatusError{StatusCode: resp.StatusCode}
 	}
 	return res, err
 }
