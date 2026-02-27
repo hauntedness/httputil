@@ -1,4 +1,4 @@
-// package httputil used for making temporary or one time request, it serves for simple task only.
+// Package httputil used for making temporary or one time request, it serves for simple task only.
 package httputil
 
 import (
@@ -18,7 +18,7 @@ const (
 
 type H map[string]string
 
-var client = &http.Client{}
+var Client = &http.Client{}
 
 func Get(url string, headers H) (data []byte, err error) {
 	return Request(http.MethodGet, url, nil, headers)
@@ -44,30 +44,35 @@ func Json[T any](method string, url string, queryObject any, headers H) (value *
 			return nil, err
 		}
 	}
+
 	reader := bytes.NewReader(data)
+
 	if headers == nil {
 		headers = make(H)
 	}
-	headers["Content-Type"] = ContentJson
+
+	if _, ok := headers["Content-Type"]; !ok {
+		headers["Content-Type"] = ContentJson
+	}
+
 	data, err = Request(method, url, reader, headers)
 	if err != nil {
 		return nil, err
 	}
+
 	t := new(T)
+
 	err = json.Unmarshal(data, t)
 	if err != nil {
-		if len(data) >= 1024 {
-			data = data[0:1025]
-			copy(data[1022:1025], "...")
-		}
-		return nil, fmt.Errorf("json.Unmarshal, data: %s, err: %w", string(data), err)
+		return nil, fmt.Errorf("json.Unmarshal error: %w", err)
 	}
+
 	return t, nil
 }
 
-// RequestAndWriteTo send request and copy response body to dst
-// it return [ErrContenthCopyLength] if the copied number of bytes doesn't match ContentLength
-func RequestAndWriteTo(dst io.Writer, method string, url string, body io.Reader, headers H) (err error) {
+// RequestW send request and copy response body to dst
+// it return [ErrContenthCopyLength] if the copied number of bytes doesn't match ContentLength.
+func RequestW(dst io.Writer, method string, url string, body io.Reader, headers H) (err error) {
 	// fmt.Println("going to: ", url)
 	req, err := http.NewRequest(method, url, body)
 	if err != nil {
@@ -81,35 +86,48 @@ func RequestAndWriteTo(dst io.Writer, method string, url string, body io.Reader,
 		req.Header.Set(k, v)
 	}
 
-	resp, err := client.Do(req)
+	resp, err := Client.Do(req)
 	if err != nil {
 		return err
 	}
-	defer resp.Body.Close()
+
+	defer func() {
+		if err2 := resp.Body.Close(); err == nil {
+			err = err2
+		}
+	}()
+
 	_, err = io.Copy(dst, resp.Body)
 	if err != nil {
 		return err
 	}
+
 	if resp.StatusCode >= 400 {
 		return &StatusError{StatusCode: resp.StatusCode}
 	}
+
 	return nil
 }
 
 // Download create file on filepath send request and copy response body to the file
-// it return [ErrContenthCopyLength] if the copied number of bytes doesn't match ContentLength
+// it return [ErrContenthCopyLength] if the copied number of bytes doesn't match ContentLength.
 func Download(filepath string, method string, url string, body io.Reader, headers H) (err error) {
 	file, err := os.Create(filepath)
 	if err != nil {
 		return err
 	}
-	defer file.Close()
-	return RequestAndWriteTo(file, method, url, body, headers)
+
+	defer func() {
+		if err2 := file.Close(); err2 != nil && err == nil {
+			err = err2
+		}
+	}()
+
+	return RequestW(file, method, url, body, headers)
 }
 
-// send request
+// Request send request.
 func Request(method string, url string, body io.Reader, headers H) (data []byte, err error) {
-	// fmt.Println("going to: ", url)
 	req, err := http.NewRequest(method, url, body)
 	if err != nil {
 		return nil, err
@@ -122,18 +140,26 @@ func Request(method string, url string, body io.Reader, headers H) (data []byte,
 		req.Header.Set(k, v)
 	}
 
-	resp, err := client.Do(req)
+	resp, err := Client.Do(req)
 	if err != nil {
 		return nil, err
 	}
-	defer resp.Body.Close()
+
+	defer func() {
+		if err2 := resp.Body.Close(); err == nil {
+			err = err2
+		}
+	}()
+
 	res, err := io.ReadAll(resp.Body)
 	if err != nil {
 		return nil, err
 	}
+
 	if resp.StatusCode >= 400 {
 		return res, &StatusError{StatusCode: resp.StatusCode}
 	}
+
 	return res, err
 }
 
@@ -144,5 +170,5 @@ func SetProxy(proxyUrl string) {
 	transport.Proxy = func(_ *http.Request) (*url.URL, error) {
 		return url.Parse(proxyUrl)
 	}
-	client.Transport = transport
+	Client.Transport = transport
 }
