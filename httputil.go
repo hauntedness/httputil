@@ -3,9 +3,12 @@ package httputil
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
+	"log/slog"
 	"net/http"
 	"net/url"
 	"os"
@@ -73,8 +76,7 @@ func Json[T any](method string, url string, queryObject any, headers H) (value *
 // RequestW send request and copy response body to dst
 // it return [ErrContenthCopyLength] if the copied number of bytes doesn't match ContentLength.
 func RequestW(dst io.Writer, method string, url string, body io.Reader, headers H) (err error) {
-	// fmt.Println("going to: ", url)
-	req, err := http.NewRequest(method, url, body)
+	req, err := http.NewRequestWithContext(context.Background(), method, url, body)
 	if err != nil {
 		return err
 	}
@@ -92,8 +94,8 @@ func RequestW(dst io.Writer, method string, url string, body io.Reader, headers 
 	}
 
 	defer func() {
-		if err2 := resp.Body.Close(); err == nil {
-			err = err2
+		if e := resp.Body.Close(); e != nil {
+			slog.Error("failed to close response body", "err", e)
 		}
 	}()
 
@@ -117,18 +119,14 @@ func Download(filepath string, method string, url string, body io.Reader, header
 		return err
 	}
 
-	defer func() {
-		if err2 := file.Close(); err2 != nil && err == nil {
-			err = err2
-		}
-	}()
+	defer func() { err = errors.Join(err, file.Close()) }()
 
 	return RequestW(file, method, url, body, headers)
 }
 
 // Request send request.
 func Request(method string, url string, body io.Reader, headers H) (data []byte, err error) {
-	req, err := http.NewRequest(method, url, body)
+	req, err := http.NewRequestWithContext(context.Background(), method, url, body)
 	if err != nil {
 		return nil, err
 	}
@@ -146,8 +144,8 @@ func Request(method string, url string, body io.Reader, headers H) (data []byte,
 	}
 
 	defer func() {
-		if err2 := resp.Body.Close(); err == nil {
-			err = err2
+		if e := resp.Body.Close(); e != nil {
+			slog.Error("failed to close response body", "err", e)
 		}
 	}()
 
